@@ -22,6 +22,7 @@ import (
 
 	"xorm.io/builder"
 	"xorm.io/core"
+	"encoding/csv"
 )
 
 // Engine is the major struct of xorm, it means a database manager.
@@ -1658,10 +1659,18 @@ func (engine *Engine) Unscoped() *Session {
 	return session.Unscoped()
 }
 
-//add by shawnye
-func (engine *Engine) ExportQueryString(w *csv.Writer,   sqlOrArgs ...interface{}) (int, error) {
+//add by shawnye,
+//orderedSeqs：最终过滤（UI调整）显示的列的顺序号列表, 例如仅仅按顺序显示 3,6,2
+func (engine *Engine) QueryString2(orderedSeqs []int, sqlorArgs ...interface{}) ([]map[string]string, []string, error) {
 	session := engine.NewSession()
 	defer session.Close()
-	return session.ExportQueryString(w, null, sqlOrArgs...)
+	return session.QueryString2(orderedSeqs, sqlorArgs...)
 }
 
+
+//add by shawnye
+func (engine *Engine) ExportQueryString(w *csv.Writer, /*orderedSeqs []int,*/ sqlOrArgs ...interface{}) (int, error) {
+	session := engine.NewSession()
+	defer session.Close()
+	return session.ExportQueryString(w, nil, sqlOrArgs...)
+}

@@ -13,6 +13,8 @@ import (
 
 	"xorm.io/builder"
 	"xorm.io/core"
+
+	"encoding/csv"
 )
 
 func (session *Session) genQuerySQL(sqlOrArgs ...interface{}) (string, []interface{}, error) {
@@ -320,6 +322,7 @@ func (session *Session) QueryInterface(sqlOrArgs ...interface{}) ([]map[string]i
 }
 
 
+
 //add by shawnye:
 func row2mapStr2(rows *core.Rows, fields []string, orderedSeqs []int) (resultsMap map[string]string, err error) {
 	result := make(map[string]string)
@@ -336,7 +339,7 @@ func row2mapStr2(rows *core.Rows, fields []string, orderedSeqs []int) (resultsMa
 		//		requiredFields = make([]string, 0)
 		for _, seq := range orderedSeqs {
 			if seq < 0 || seq >= len(fields) {
-				return nil, fmt.Errorf("Ë÷ÒıºÅ[%v]³¬³öSQLÌá¹©µÄ×î´óÁĞÊı-1:%v", seq, len(fields)-1) //errors.New("Ë÷ÒıºÅ³¬³öSQLÌá¹©µÄÁĞÊı:" + strconv.Itoa(seq)
+				return nil, fmt.Errorf("ç´¢å¼•å·[%v]è¶…å‡ºSQLæä¾›çš„æœ€å¤§åˆ—æ•°-1:%v", seq, len(fields)-1) //errors.New("ç´¢å¼•å·è¶…å‡ºSQLæä¾›çš„åˆ—æ•°:" + strconv.Itoa(seq)
 			}
 			key := fields[seq]
 
@@ -378,7 +381,7 @@ func row2mapStr2(rows *core.Rows, fields []string, orderedSeqs []int) (resultsMa
 }
 
 //add by shawnye
-//orderedSeqs£º×îÖÕ¹ıÂË£¨UIµ÷Õû£©ÏÔÊ¾µÄÁĞµÄË³ĞòºÅÁĞ±í, ÀıÈç½ö½ö°´Ë³ĞòÏÔÊ¾ 3,6,2
+//orderedSeqsï¼šæœ€ç»ˆè¿‡æ»¤ï¼ˆUIè°ƒæ•´ï¼‰æ˜¾ç¤ºçš„åˆ—çš„é¡ºåºå·åˆ—è¡¨, ä¾‹å¦‚ä»…ä»…æŒ‰é¡ºåºæ˜¾ç¤º 3,6,2
 func rows2Strings2(rows *core.Rows, orderedSeqs []int) (resultsSlice []map[string]string, fields []string, err error) {
 	fields, err = rows.Columns()
 	if err != nil {
@@ -390,7 +393,7 @@ func rows2Strings2(rows *core.Rows, orderedSeqs []int) (resultsSlice []map[strin
 		fields2 = make([]string, 0)
 		for _, seq := range orderedSeqs {
 			if seq < 0 || seq >= len(fields) {
-				return nil, nil, fmt.Errorf("Ë÷ÒıºÅ[%v]³¬³öSQLÌá¹©µÄ×î´óÁĞÊı-1:%v", seq, len(fields)-1) //errors.New("Ë÷ÒıºÅ³¬³öSQLÌá¹©µÄÁĞÊı:" + strconv.Itoa(seq)
+				return nil, nil, fmt.Errorf("ç´¢å¼•å·[%v]è¶…å‡ºSQLæä¾›çš„æœ€å¤§åˆ—æ•°-1:%v", seq, len(fields)-1) //errors.New("ç´¢å¼•å·è¶…å‡ºSQLæä¾›çš„åˆ—æ•°:" + strconv.Itoa(seq)
 			}
 			fields2 = append(fields2, fields[seq])
 		}
@@ -419,7 +422,7 @@ func rows2csv(rows *core.Rows, w *csv.Writer, orderedSeqs []int) (lines int, err
 		fields2 = make([]string, 0)
 		for _, seq := range orderedSeqs {
 			if seq < 0 || seq >= len(fields) {
-				return -1, fmt.Errorf("Ë÷ÒıºÅ[%v]³¬³öSQLÌá¹©µÄ×î´óÁĞÊı-1:%v", seq, len(fields)-1) //errors.New("Ë÷ÒıºÅ³¬³öSQLÌá¹©µÄÁĞÊı:" + strconv.Itoa(seq)
+				return -1, fmt.Errorf("ç´¢å¼•å·[%v]è¶…å‡ºSQLæä¾›çš„æœ€å¤§åˆ—æ•°-1:%v", seq, len(fields)-1) //errors.New("ç´¢å¼•å·è¶…å‡ºSQLæä¾›çš„åˆ—æ•°:" + strconv.Itoa(seq)
 			}
 			fields2 = append(fields2, fields[seq])
 		}
@@ -460,11 +463,14 @@ func (session *Session) ExportQueryString(w *csv.Writer, orderedSeqs []int, sqlo
 
 	sqlStr, args, err := session.genQuerySQL(sqlorArgs...)
 	if err != nil {
+		//println("fail to genQuerySQL", err.Error())
 		return -1, err
 	}
 
 	rows, err := session.queryRows(sqlStr, args...)
 	if err != nil {
+	//	println("fail to queryRows", err.Error())
+
 		return -1, err
 	}
 	defer rows.Close()
