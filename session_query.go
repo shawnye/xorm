@@ -318,3 +318,178 @@ func (session *Session) QueryInterface(sqlOrArgs ...interface{}) ([]map[string]i
 
 	return rows2Interfaces(rows)
 }
+
+
+//add by shawnye:
+func row2mapStr2(rows *core.Rows, fields []string, orderedSeqs []int) (resultsMap map[string]string, err error) {
+	result := make(map[string]string)
+	scanResultContainers := make([]interface{}, len(fields))
+	for i := 0; i < len(fields); i++ {
+		var scanResultContainer interface{}
+		scanResultContainers[i] = &scanResultContainer
+	}
+	if err := rows.Scan(scanResultContainers...); err != nil {
+		return nil, err
+	}
+
+	if orderedSeqs != nil && len(orderedSeqs) > 0 {
+		//		requiredFields = make([]string, 0)
+		for _, seq := range orderedSeqs {
+			if seq < 0 || seq >= len(fields) {
+				return nil, fmt.Errorf("索引号[%v]超出SQL提供的最大列数-1:%v", seq, len(fields)-1) //errors.New("索引号超出SQL提供的列数:" + strconv.Itoa(seq)
+			}
+			key := fields[seq]
+
+			//			requiredFields = append(requiredFields, key)
+			rawValue := reflect.Indirect(reflect.ValueOf(scanResultContainers[seq]))
+			// if row is null then as empty string
+			if rawValue.Interface() == nil {
+				result[key] = ""
+				continue
+			}
+
+			if data, err := value2String(&rawValue); err == nil {
+				result[key] = data
+			} else {
+				return nil, err
+			}
+		}
+
+		return result, nil
+	} else {
+		for ii, key := range fields {
+
+			rawValue := reflect.Indirect(reflect.ValueOf(scanResultContainers[ii]))
+			// if row is null then as empty string
+			if rawValue.Interface() == nil {
+				result[key] = ""
+				continue
+			}
+
+			if data, err := value2String(&rawValue); err == nil {
+				result[key] = data
+			} else {
+				return nil, err
+			}
+		}
+		return result, nil //cols, data, error
+	}
+
+}
+
+//add by shawnye
+//orderedSeqs：最终过滤（UI调整）显示的列的顺序号列表, 例如仅仅按顺序显示 3,6,2
+func rows2Strings2(rows *core.Rows, orderedSeqs []int) (resultsSlice []map[string]string, fields []string, err error) {
+	fields, err = rows.Columns()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	fields2 := fields
+	if orderedSeqs != nil && len(orderedSeqs) > 0 {
+		fields2 = make([]string, 0)
+		for _, seq := range orderedSeqs {
+			if seq < 0 || seq >= len(fields) {
+				return nil, nil, fmt.Errorf("索引号[%v]超出SQL提供的最大列数-1:%v", seq, len(fields)-1) //errors.New("索引号超出SQL提供的列数:" + strconv.Itoa(seq)
+			}
+			fields2 = append(fields2, fields[seq])
+		}
+	}
+
+	for rows.Next() {
+		result, err := row2mapStr2(rows, fields, orderedSeqs)
+		if err != nil {
+			return nil, nil, err
+		}
+		resultsSlice = append(resultsSlice, result)
+	}
+	//	log.Printf("fields2=%v\n", fields2)
+	return resultsSlice, fields2, nil
+}
+
+//add by shawnye
+func rows2csv(rows *core.Rows, w *csv.Writer, orderedSeqs []int) (lines int, err error) {
+	fields, err := rows.Columns()
+	if err != nil {
+		return -1, err
+	}
+
+	fields2 := fields
+	if orderedSeqs != nil && len(orderedSeqs) > 0 {
+		fields2 = make([]string, 0)
+		for _, seq := range orderedSeqs {
+			if seq < 0 || seq >= len(fields) {
+				return -1, fmt.Errorf("索引号[%v]超出SQL提供的最大列数-1:%v", seq, len(fields)-1) //errors.New("索引号超出SQL提供的列数:" + strconv.Itoa(seq)
+			}
+			fields2 = append(fields2, fields[seq])
+		}
+	}
+
+	err = w.Write(fields2)
+	if err != nil {
+		return -1, err
+	}
+
+	for rows.Next() {
+		result, err := row2mapStr2(rows, fields, orderedSeqs)
+		if err != nil {
+			return -1, err
+		}
+		r := make([]string, 0)
+		for _, fn := range fields2 {
+			r = append(r, result[fn]) //ordered ,shoud not error
+		}
+		err = w.Write(r)
+		if err != nil {
+			return -1, err
+		}
+
+		lines++
+	}
+
+	w.Flush()
+
+	return lines, nil
+}
+
+//add by shawnye, export to csv
+func (session *Session) ExportQueryString(w *csv.Writer, orderedSeqs []int, sqlorArgs ...interface{}) (int, error) {
+	if session.isAutoClose {
+		defer session.Close()
+	}
+
+	sqlStr, args, err := session.genQuerySQL(sqlorArgs...)
+	if err != nil {
+		return -1, err
+	}
+
+	rows, err := session.queryRows(sqlStr, args...)
+	if err != nil {
+		return -1, err
+	}
+	defer rows.Close()
+
+	return rows2csv(rows, w, orderedSeqs)
+}
+
+//add by shawnye,
+func (session *Session) QueryString2(orderedSeqs []int, sqlorArgs ...interface{}) ([]map[string]string, []string, error) {
+	if session.isAutoClose {
+		defer session.Close()
+	}
+
+	sqlStr, args, err := session.genQuerySQL(sqlorArgs...)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	//	fmt.Println("QueryString2:", sqlStr)
+
+	rows, err := session.queryRows(sqlStr, args...)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+
+	return rows2Strings2(rows, orderedSeqs)
+}

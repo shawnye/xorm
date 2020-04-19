@@ -1657,3 +1657,11 @@ func (engine *Engine) Unscoped() *Session {
 	session.isAutoClose = true
 	return session.Unscoped()
 }
+
+//add by shawnye
+func (engine *Engine) ExportQueryString(w *csv.Writer,   sqlOrArgs ...interface{}) (int, error) {
+	session := engine.NewSession()
+	defer session.Close()
+	return session.ExportQueryString(w, null, sqlOrArgs...)
+}
+
